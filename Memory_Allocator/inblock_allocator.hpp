@@ -10,14 +10,13 @@
 
 #include <cstdint>
 
-#include<iostream>
-
 // Acts as a header before actual payload
 struct Block
 {
-	std::size_t size;
+	std::size_t size;	// assuming size_t is 32bit on 32bit systems and 64bit on 64bit systems
 	Block* next;
 	Block* previous;
+	void* padding;	// padding so that user data is 8 bytes aligned
 };
 
 // We align returned addresses to word - 8 bytes
@@ -45,10 +44,6 @@ public:
 	}
 };
 
-/*std::size_t inblock_allocator_heap::n_bytes_ = 0;
-Block* inblock_allocator_heap::ptr_ = nullptr;
-Block* inblock_allocator_heap::head = nullptr;*/
-
 template<typename T, typename HeapHolder>
 class inblock_allocator 
 {
@@ -69,7 +64,7 @@ public:
 
 	void deallocate(T* ptr, std::size_t n)
 	{
-
+		
 	}
 
 	inblock_allocator() = default;
