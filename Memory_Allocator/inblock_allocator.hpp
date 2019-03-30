@@ -183,12 +183,18 @@ private:
 			it = it->next;
 		}
 
-		// If the block should be at the end
-		if (!it)
+		// If the block should be at the end of the list
+		if (!it && prev)
 		{
 			prev->next = block;
 			block->previous = prev;
 			block->next = nullptr;
+		}
+		else if (!it)	// If the free list was empty to begin with
+		{
+			HeapHolder::heap.m_listHead = block;
+			block->next = nullptr;
+			block->previous = nullptr;
 		}
 
 	}
