@@ -9,7 +9,7 @@
 #ifndef inblock_allocator_hpp
 #define inblock_allocator_hpp
 
-#include<cstddef>
+#include <cstddef>
 #include <cstdint>
 
 // Acts as a header before actual payload
