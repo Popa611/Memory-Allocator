@@ -1,6 +1,7 @@
 /*
-	REQUIRED STD:C++17 for inline static members (so that the user does not have to define those static members in .cpp file
-													and so that this header can be included multiple times)
+	REQUIRED STD:C++17 for inline static members as required in interface
+	(so that the user does not have to define those static members in .cpp file
+		and so that this header can be included multiple times)
 
 
 
@@ -8,6 +9,7 @@
 #ifndef inblock_allocator_hpp
 #define inblock_allocator_hpp
 
+#include<cstddef>
 #include <cstdint>
 
 // Acts as a header before actual payload
@@ -22,28 +24,6 @@ struct Block
 // We align returned addresses to word - 8 bytes
 using word = uint64_t;
 
-class inblock_allocator_heap 
-{
-	template<typename T, typename HeapHolder>
-	friend class inblock_allocator;
-
-private:
-	inline static  std::size_t n_bytes_;	// Heap size in bytes
-	inline static Block* ptr_;	// Start of the heap
-	inline static Block* head;	// Head of the free list
-
-public:
-	void operator()(void* ptr, std::size_t n_bytes) 
-	{  
-		n_bytes_ = n_bytes;
-		ptr_ = (Block*)ptr;
-		ptr_->next = nullptr;
-		ptr_->previous = nullptr;
-		ptr_->size = n_bytes - sizeof(Block);	// size indicates only bytes free for data (without header overhead)
-		head = ptr_;
-	}
-};
-
 template<typename T, typename HeapHolder>
 class inblock_allocator 
 {
@@ -53,7 +33,7 @@ public:
 	T* allocate(std::size_t n)
 	{
 		std::size_t size = get_aligned_size(n*sizeof(T));	// Needed size for user data
-		Block* best = find_best_fit(size+sizeof(Block));	// Find the best-fit block (which can accommodate both payload and header
+		Block* best = find_best_fit(size);
 
 		remove_and_split(best, size);
 
@@ -64,7 +44,11 @@ public:
 
 	void deallocate(T* ptr, std::size_t n)
 	{
-		
+		std::size_t size = get_aligned_size(n * sizeof(T));
+		Block* block = (Block*)((char*)ptr - sizeof(Block));
+		block->size = size;
+
+		insert_into_free_list(block);
 	}
 
 	inblock_allocator() = default;
@@ -85,8 +69,19 @@ private:
 	// Returns the minimum sized block, which can accommodate the data
 	Block* find_best_fit(std::size_t size)
 	{
-		Block* it = HeapHolder::heap.head;
-		Block* best = it;
+		Block* it = HeapHolder::heap.m_listHead;
+		Block* best = nullptr;	// Stays nullptr if no big enough chunk exists
+
+		while(it)
+		{
+			if (it->size >= size)
+			{
+				best = it;
+				it = it->next;
+				break;
+			}
+			it = it->next;
+		}
 
 		while (it)
 		{
@@ -117,7 +112,7 @@ private:
 			}
 			else if (block->next)	// At the beginning
 			{
-				HeapHolder::heap.head = block->next;
+				HeapHolder::heap.m_listHead = block->next;
 				block->next->previous = nullptr;
 			}
 			else
@@ -146,7 +141,7 @@ private:
 			}
 			else if (block->next)
 			{
-				HeapHolder::heap.head = remainder;
+				HeapHolder::heap.m_listHead = remainder;
 				block->next->previous = remainder;
 				remainder->next = block->next;
 				remainder->previous = nullptr;
@@ -155,9 +150,74 @@ private:
 			{
 				remainder->next = nullptr;
 				remainder->previous = nullptr;
-				HeapHolder::heap.head = remainder;
+				HeapHolder::heap.m_listHead = remainder;
 			}
 		}
+		block->next = nullptr;
+		block->previous = nullptr;
+	}
+
+	void insert_into_free_list(Block* block)
+	{
+		// Find a place to insert the block
+		Block* it = HeapHolder::heap.m_listHead;
+		Block* prev = HeapHolder::heap.m_listHead;
+		while (it) 
+		{
+			if (block < it) 
+			{
+				block->next = it;
+
+				// Block is somewhere in the middle
+				if (prev->previous)
+				{
+					block->previous = prev;
+					prev->next = block;
+				}
+				else	// Block is at the beginning
+				{
+					block->previous = nullptr;
+					HeapHolder::heap.m_listHead = block;
+				}
+
+				it->previous = block;
+
+				break;
+			}
+			prev = it;
+			it = it->next;
+		}
+
+		// If the block should be at the end
+		if (!it)
+		{
+			prev->next = block;
+			block->previous = prev;
+			block->next = nullptr;
+		}
+
+	}
+};
+
+class inblock_allocator_heap
+{
+	template<typename T, typename HeapHolder>
+	friend class inblock_allocator;
+
+private:
+	inline static  std::size_t m_bytes;	// Heap size in bytes
+	inline static Block* m_heapPtr;	// Start of the heap
+	inline static Block* m_listHead;	// Head of the free list
+
+public:
+	void operator()(void* ptr, std::size_t n_bytes)
+	{
+		m_bytes = n_bytes;
+		m_heapPtr = (Block*)ptr;
+		m_heapPtr->next = nullptr;
+		m_heapPtr->previous = nullptr;
+		m_heapPtr->size = n_bytes - sizeof(Block);	// size indicates only bytes free for data (without header overhead)
+		m_listHead = m_heapPtr;
 	}
 };
 
