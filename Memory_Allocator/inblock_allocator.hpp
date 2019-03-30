@@ -161,26 +161,21 @@ private:
 	{
 		// Find a place to insert the block
 		Block* it = HeapHolder::heap.m_listHead;
-		Block* prev = HeapHolder::heap.m_listHead;
+		Block* prev = nullptr;
 		while (it) 
 		{
 			if (block < it) 
 			{
 				block->next = it;
+				block->previous = prev;
 
-				// Block is somewhere in the middle
-				if (prev->previous)
-				{
-					block->previous = prev;
+				if (prev)
 					prev->next = block;
-				}
-				else	// Block is at the beginning
-				{
-					block->previous = nullptr;
-					HeapHolder::heap.m_listHead = block;
-				}
 
 				it->previous = block;
+
+				if (!block->previous)
+					HeapHolder::heap.m_listHead = block;
 
 				break;
 			}
