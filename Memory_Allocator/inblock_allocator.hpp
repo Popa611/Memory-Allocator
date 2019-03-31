@@ -74,7 +74,7 @@ private:
 		// Find first fitting
 		while(it)
 		{
-			if (it->size >= size)
+			if (it->size > size + HeapHolder::heap.headerSize)
 			{
 				best = it;
 				it = it->next;
@@ -86,7 +86,7 @@ private:
 		// Try to find the best
 		while (it)
 		{
-			if (it->size >= size && it->size < best->size)
+			if ((it->size > size + HeapHolder::heap.headerSize) && it->size < best->size)
 			{
 				best = it;
 			}
