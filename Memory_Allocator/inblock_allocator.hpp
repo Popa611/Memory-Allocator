@@ -15,10 +15,9 @@
 // Acts as a header before actual payload
 struct Block
 {
-	std::size_t size;	// assuming size_t is 32bit on 32bit systems and 64bit on 64bit systems
+	std::size_t size;
 	Block* next;
 	Block* previous;
-	void* padding;	// padding so that user data is 8 bytes aligned
 };
 
 // We align returned addresses to word - 8 bytes
@@ -39,13 +38,13 @@ public:
 
 		best->size = size;
 
-		return (T*)((char*)best + sizeof(Block));	// We return header+sizeof(Block) -> pointer to memory for user data
+		return (T*)((char*)best + HeapHolder::heap.headerSize);	// We return header+sizeof(Block) -> pointer to memory for user data
 	}
 
 	void deallocate(T* ptr, std::size_t n)
 	{
 		std::size_t size = get_aligned_size(n * sizeof(T));
-		Block* block = (Block*)((char*)ptr - sizeof(Block));
+		Block* block = (Block*)((char*)ptr - HeapHolder::heap.headerSize);
 
 		insert_into_free_list(block);
 		merge_adjacent_blocks(block);
@@ -72,6 +71,7 @@ private:
 		Block* it = HeapHolder::heap.m_listHead;
 		Block* best = nullptr;	// Stays nullptr if no big enough chunk exists
 
+		// Find first fitting
 		while(it)
 		{
 			if (it->size >= size)
@@ -83,6 +83,7 @@ private:
 			it = it->next;
 		}
 
+		// Try to find the best
 		while (it)
 		{
 			if (it->size >= size && it->size < best->size)
@@ -117,13 +118,13 @@ private:
 			}
 			else
 			{
-				// nothing to do (the free list remains empty because we have nothing to add)
+				HeapHolder::heap.m_listHead = nullptr;
 			}
 		}
 		else	// If the block is bigger, we split it and add a new chunk to free list
 		{
-			Block* remainder = (Block*)((char*)block + needed_size + sizeof(Block));
-			remainder->size = block->size - needed_size - sizeof(Block);
+			Block* remainder = (Block*)((char*)block + needed_size + HeapHolder::heap.headerSize);
+			remainder->size = block->size - needed_size - HeapHolder::heap.headerSize;
 
 			if (block->previous && block->next)
 			{
@@ -169,11 +170,10 @@ private:
 
 				if (prev)
 					prev->next = block;
+				else
+					HeapHolder::heap.m_listHead = block;
 
 				it->previous = block;
-
-				if (!block->previous)
-					HeapHolder::heap.m_listHead = block;
 
 				break;
 			}
@@ -201,22 +201,23 @@ private:
 	void merge_adjacent_blocks(Block* block)
 	{
 		// Adjacent next block is free
-		if (block->next && block->next == (Block*)((char*)block + sizeof(Block) + block->size))
+		if (block->next && block->next == (Block*)((char*)block + HeapHolder::heap.headerSize + block->size))
 		{
-			block->size = block->size + block->next->size + sizeof(Block);
+			block->size = block->size + block->next->size + HeapHolder::heap.headerSize;
 			block->next = block->next->next;
 			if (block->next)
 				block->next->previous = block;
 		}
 
 		// Adjacent previous block is free
-		if (block->previous && block == (Block*)((char*)block->previous + sizeof(Block) + block->previous->size))
+		if (block->previous && block == (Block*)((char*)block->previous + HeapHolder::heap.headerSize + block->previous->size))
 		{
-			block->previous->size = block->size + block->previous->size + sizeof(Block);
+			block->previous->size = block->size + block->previous->size + HeapHolder::heap.headerSize;
 			block->previous->next = block->next;
 			if (block->next)
 				block->next->previous = block->previous;
-			HeapHolder::heap.m_listHead = block->previous;
+			if (!block->previous->previous)
+				HeapHolder::heap.m_listHead = block->previous;
 		}
 	}
 };
@@ -230,6 +231,7 @@ private:
 	inline static  std::size_t m_bytes;	// Heap size in bytes
 	inline static Block* m_heapPtr;	// Start of the heap
 	inline static Block* m_listHead;	// Head of the free list
+	inline constexpr static std::size_t headerSize = 8;	// sizeof(size_t) + (8 - sizeof(size_t)); that is if size_t is maximally 64bit
 
 public:
 	void operator()(void* ptr, std::size_t n_bytes)
@@ -238,7 +240,7 @@ public:
 		m_heapPtr = (Block*)ptr;
 		m_heapPtr->next = nullptr;
 		m_heapPtr->previous = nullptr;
-		m_heapPtr->size = n_bytes - sizeof(Block);	// size indicates only bytes free for data (without header overhead)
+		m_heapPtr->size = n_bytes - headerSize;	// size indicates only bytes free for data (without header overhead)
 		m_listHead = m_heapPtr;
 	}
 };
