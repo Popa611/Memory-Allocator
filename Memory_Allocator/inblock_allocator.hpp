@@ -62,6 +62,8 @@ public:
 private:
 	std::size_t get_aligned_size(std::size_t size)
 	{
+		if (sizeof(Block*) == 8)	// Extra space is needed for 8byte pointers on x64
+			return (size+8 + sizeof(word) - 1) & ~(sizeof(word) - 1);
 		return (size + sizeof(word) - 1) & ~(sizeof(word) - 1);
 	}
 
@@ -70,6 +72,9 @@ private:
 	{
 		Block* it = HeapHolder::heap.m_listHead;
 		Block* best = nullptr;	// Stays nullptr if no big enough chunk exists
+
+		if (sizeof(Block*) == 8)	// So that the smallest remainder in case of splitting chunks is 16 bytes for user data on x64
+			size += 8;
 
 		// Find first fitting
 		while(it)
