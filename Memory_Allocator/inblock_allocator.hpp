@@ -46,9 +46,9 @@ public:
 	{
 		std::size_t size = get_aligned_size(n * sizeof(T));
 		Block* block = (Block*)((char*)ptr - sizeof(Block));
-		block->size = size;
 
 		insert_into_free_list(block);
+		merge_adjacent_blocks(block);
 	}
 
 	inblock_allocator() = default;
@@ -153,8 +153,6 @@ private:
 				HeapHolder::heap.m_listHead = remainder;
 			}
 		}
-		block->next = nullptr;
-		block->previous = nullptr;
 	}
 
 	void insert_into_free_list(Block* block)
@@ -197,6 +195,29 @@ private:
 			block->previous = nullptr;
 		}
 
+	}
+
+	// Merges adjacent free blocks if there are any to avoid fragmentation
+	void merge_adjacent_blocks(Block* block)
+	{
+		// Adjacent next block is free
+		if (block->next && block->next == (Block*)((char*)block + sizeof(Block) + block->size))
+		{
+			block->size = block->size + block->next->size + sizeof(Block);
+			block->next = block->next->next;
+			if (block->next)
+				block->next->previous = block;
+		}
+
+		// Adjacent previous block is free
+		if (block->previous && block == (Block*)((char*)block->previous + sizeof(Block) + block->previous->size))
+		{
+			block->previous->size = block->size + block->previous->size + sizeof(Block);
+			block->previous->next = block->next;
+			if (block->next)
+				block->next->previous = block->previous;
+			HeapHolder::heap.m_listHead = block->previous;
+		}
 	}
 };
 
