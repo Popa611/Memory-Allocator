@@ -34,6 +34,9 @@ public:
 		std::size_t size = get_aligned_size(n*sizeof(T));	// Needed size for user data
 		Block* best = find_best_fit(size);
 
+		if (!best)	// No suitable chunk found
+			throw std::bad_alloc();
+
 		remove_and_split(best, size);
 
 		best->size = size;
@@ -161,6 +164,7 @@ private:
 		}
 	}
 
+	// Inserts block to the right place in the free list
 	void insert_into_free_list(Block* block)
 	{
 		// Find a place to insert the block
@@ -168,6 +172,11 @@ private:
 		Block* prev = nullptr;
 		while (it) 
 		{
+			/*if (block == it)
+			{
+				throw AlreadyDeallocatedEx();
+			}
+			else*/
 			if (block < it) 
 			{
 				block->next = it;
