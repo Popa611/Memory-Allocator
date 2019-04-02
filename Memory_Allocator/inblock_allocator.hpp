@@ -2,7 +2,7 @@
 	REQUIRED STD:C++17 for inline static members as required in interface
 	(so that the user does not have to define those static members in .cpp file
 		and so that this header can be included multiple times)
-
+	This allocator supports only 32bit or 64bit systems.
 
 
 */
@@ -12,7 +12,7 @@
 #include <cstddef>
 #include <cstdint>
 
-// Acts as a header before actual payload
+// Chunk header
 struct Block
 {
 	std::size_t size;
@@ -41,7 +41,7 @@ public:
 
 		best->size = size;
 
-		return (T*)((char*)best + HeapHolder::heap.headerSize);	// We return header+sizeof(Block) -> pointer to memory for user data
+		return (T*)((char*)best + HeapHolder::heap.headerSize);	// We return header+8 -> pointer to memory for user data
 	}
 
 	void deallocate(T* ptr, std::size_t n)
@@ -65,9 +65,7 @@ public:
 private:
 	std::size_t get_aligned_size(std::size_t size)
 	{
-		if (sizeof(Block*) == 8)	// Extra space is needed for 8byte pointers on x64
-			return (size+8 + sizeof(word) - 1) & ~(sizeof(word) - 1);
-		return (size + sizeof(word) - 1) & ~(sizeof(word) - 1);
+		return (size+HeapHolder::heap.m_padding + sizeof(word) - 1) & ~(sizeof(word) - 1);
 	}
 
 	// Returns the minimum sized block, which can accommodate the data
@@ -75,9 +73,7 @@ private:
 	{
 		Block* it = HeapHolder::heap.m_listHead;
 		Block* best = nullptr;	// Stays nullptr if no big enough chunk exists
-
-		if (sizeof(Block*) == 8)	// So that the smallest remainder in case of splitting chunks is 16 bytes for user data on x64
-			size += 8;
+		size += HeapHolder::heap.m_padding;
 
 		// Find first fitting
 		while(it)
@@ -246,7 +242,8 @@ private:
 	inline static Block* m_heapPtr;	// Start of the heap
 	inline static Block* m_listHead;	// Head of the free list
 	inline constexpr static std::size_t headerSize = 8;	// sizeof(size_t) + (8 - sizeof(size_t)); that is if size_t is maximally 64bit
-
+	inline constexpr static std::size_t m_padding = sizeof(void*) == 8 ? 8 : 0;	// We need to pad properly on x64 bit systems - this means that the allocator supports
+																					// only 32bit or 64bit systems
 public:
 	void operator()(void* ptr, std::size_t n_bytes)
 	{
