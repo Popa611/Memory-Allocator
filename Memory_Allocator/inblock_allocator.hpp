@@ -61,12 +61,12 @@ public:
 
 		remove_and_split(best, size);
 		best->size = size;
-		return (T*)((char*)best + HeapHolder::heap.m_headerSize);	// We return header+8 -> pointer to memory for user data
+		return reinterpret_cast<T*>(reinterpret_cast<char*>(best) + HeapHolder::heap.m_headerSize);	// We return header+8 -> pointer to memory for user data
 	}
 
 	void deallocate(T* ptr, std::size_t n)
 	{
-		Block* block = (Block*)((char*)ptr - HeapHolder::heap.m_headerSize);
+		Block* block = reinterpret_cast<Block*>(reinterpret_cast<char*>(ptr) - HeapHolder::heap.m_headerSize);
 		insert_into_free_list(block);
 		merge_adjacent_blocks(block);
 	}
@@ -146,7 +146,7 @@ private:
 		}
 		else	// If the block is bigger, we split it and add a new chunk to free list
 		{
-			Block* remainder = (Block*)((char*)block + needed_size + HeapHolder::heap.m_headerSize);
+			Block* remainder = reinterpret_cast<Block*>(reinterpret_cast<char*>(block) + needed_size + HeapHolder::heap.m_headerSize);
 			remainder->size = block->size - needed_size - HeapHolder::heap.m_headerSize;
 
 			if (block->previous && block->next)
@@ -230,7 +230,7 @@ private:
 	void merge_adjacent_blocks(Block* block)
 	{
 		// Adjacent next block is free
-		if (block->next && block->next == (Block*)((char*)block + HeapHolder::heap.m_headerSize + block->size))
+		if (block->next && block->next == reinterpret_cast<Block*>(reinterpret_cast<char*>(block) + HeapHolder::heap.m_headerSize + block->size))
 		{
 			block->size = block->size + block->next->size + HeapHolder::heap.m_headerSize;
 			block->next = block->next->next;
@@ -239,7 +239,7 @@ private:
 		}
 
 		// Adjacent previous block is free
-		if (block->previous && block == (Block*)((char*)block->previous + HeapHolder::heap.m_headerSize + block->previous->size))
+		if (block->previous && block == reinterpret_cast<Block*>(reinterpret_cast<char*>(block->previous) + HeapHolder::heap.m_headerSize + block->previous->size))
 		{
 			block->previous->size = block->size + block->previous->size + HeapHolder::heap.m_headerSize;
 			block->previous->next = block->next;
@@ -268,7 +268,7 @@ public:
 	{
 		// I assume that the ptr is already divisible by 8. If I could not assume it I would have to add extra if condition adding some padding.
 		m_bytes = n_bytes;
-		m_heapPtr = (Block*)ptr;
+		m_heapPtr = reinterpret_cast<Block*>(ptr);
 		m_heapPtr->next = nullptr;
 		m_heapPtr->previous = nullptr;
 		m_heapPtr->size = n_bytes - m_headerSize;	// size indicates only bytes free for data (without header overhead)
