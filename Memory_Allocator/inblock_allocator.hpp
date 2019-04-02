@@ -24,6 +24,9 @@
 	This implementation on x86 is a little bit slower than the std allocator tested on matrix operations according to microbenchmarks using std::chrono.
 	However on x64 it looks like it is a little bit faster on the same matrix operations.
 
+	When no suitable chunk exists during allocation -> bad_alloc exception is thrown.
+	When deallocating already free memory -> undefined behaviour.
+
 */
 #ifndef inblock_allocator_hpp
 #define inblock_allocator_hpp
@@ -57,17 +60,13 @@ public:
 			throw std::bad_alloc();
 
 		remove_and_split(best, size);
-
 		best->size = size;
-
-		return (T*)((char*)best + HeapHolder::heap.headerSize);	// We return header+8 -> pointer to memory for user data
+		return (T*)((char*)best + HeapHolder::heap.m_headerSize);	// We return header+8 -> pointer to memory for user data
 	}
 
 	void deallocate(T* ptr, std::size_t n)
 	{
-		std::size_t size = get_aligned_size(n * sizeof(T));
-		Block* block = (Block*)((char*)ptr - HeapHolder::heap.headerSize);
-
+		Block* block = (Block*)((char*)ptr - HeapHolder::heap.m_headerSize);
 		insert_into_free_list(block);
 		merge_adjacent_blocks(block);
 	}
@@ -98,7 +97,7 @@ private:
 		// Find first fitting
 		while(it)
 		{
-			if (it->size > size + HeapHolder::heap.headerSize)
+			if (it->size > size + HeapHolder::heap.m_headerSize)
 			{
 				best = it;
 				it = it->next;
@@ -110,7 +109,7 @@ private:
 		// Try to find the best
 		while (it)
 		{
-			if ((it->size > size + HeapHolder::heap.headerSize) && it->size < best->size)
+			if ((it->size > size + HeapHolder::heap.m_headerSize) && it->size < best->size)
 			{
 				best = it;
 			}
@@ -147,8 +146,8 @@ private:
 		}
 		else	// If the block is bigger, we split it and add a new chunk to free list
 		{
-			Block* remainder = (Block*)((char*)block + needed_size + HeapHolder::heap.headerSize);
-			remainder->size = block->size - needed_size - HeapHolder::heap.headerSize;
+			Block* remainder = (Block*)((char*)block + needed_size + HeapHolder::heap.m_headerSize);
+			remainder->size = block->size - needed_size - HeapHolder::heap.m_headerSize;
 
 			if (block->previous && block->next)
 			{
@@ -231,18 +230,18 @@ private:
 	void merge_adjacent_blocks(Block* block)
 	{
 		// Adjacent next block is free
-		if (block->next && block->next == (Block*)((char*)block + HeapHolder::heap.headerSize + block->size))
+		if (block->next && block->next == (Block*)((char*)block + HeapHolder::heap.m_headerSize + block->size))
 		{
-			block->size = block->size + block->next->size + HeapHolder::heap.headerSize;
+			block->size = block->size + block->next->size + HeapHolder::heap.m_headerSize;
 			block->next = block->next->next;
 			if (block->next)
 				block->next->previous = block;
 		}
 
 		// Adjacent previous block is free
-		if (block->previous && block == (Block*)((char*)block->previous + HeapHolder::heap.headerSize + block->previous->size))
+		if (block->previous && block == (Block*)((char*)block->previous + HeapHolder::heap.m_headerSize + block->previous->size))
 		{
-			block->previous->size = block->size + block->previous->size + HeapHolder::heap.headerSize;
+			block->previous->size = block->size + block->previous->size + HeapHolder::heap.m_headerSize;
 			block->previous->next = block->next;
 			if (block->next)
 				block->next->previous = block->previous;
@@ -261,17 +260,18 @@ private:
 	inline static  std::size_t m_bytes;	// Heap size in bytes
 	inline static Block* m_heapPtr;	// Start of the heap
 	inline static Block* m_listHead;	// Head of the free list
-	inline constexpr static std::size_t headerSize = 8;	// sizeof(size_t) + (8 - sizeof(size_t)); that is if size_t is maximally 64bit
+	inline constexpr static std::size_t m_headerSize = 8;	// sizeof(size_t) + (8 - sizeof(size_t)); that is if size_t is maximally 64bit
 	inline constexpr static std::size_t m_padding = sizeof(void*) == 8 ? 8 : 0;	// We need to pad properly on x64 bit systems - this means that the allocator supports
 																					// only 32bit or 64bit systems
 public:
 	void operator()(void* ptr, std::size_t n_bytes)
 	{
+		// I assume that the ptr is already divisible by 8. If I could not assume it I would have to add extra if condition adding some padding.
 		m_bytes = n_bytes;
 		m_heapPtr = (Block*)ptr;
 		m_heapPtr->next = nullptr;
 		m_heapPtr->previous = nullptr;
-		m_heapPtr->size = n_bytes - headerSize;	// size indicates only bytes free for data (without header overhead)
+		m_heapPtr->size = n_bytes - m_headerSize;	// size indicates only bytes free for data (without header overhead)
 		m_listHead = m_heapPtr;
 	}
 };
