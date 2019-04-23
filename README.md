@@ -20,5 +20,5 @@ This merging **minimizes fragmentation**.
 This implementation on x86 is a little bit slower than the std allocator tested on matrix operations according to microbenchmarks using std::chrono.
 However on x64 it looks like it is a little bit faster on the same matrix operations. Everything is tested on Windows 10.
 
-When no suitable chunk exists during allocation -> bad_alloc exception is thrown.
+When no suitable chunk exists during allocation -> bad_alloc exception is thrown.  
 When deallocating already free memory -> undefined behaviour.
