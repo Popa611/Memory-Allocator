@@ -155,7 +155,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="Memory_Allocator.cpp" />
+    <ClCompile Include="allocator_test.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="inblock_allocator.hpp" />
