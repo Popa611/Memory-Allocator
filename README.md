@@ -1,6 +1,8 @@
 # Memory Allocator
 This allocator supports **only 32bit or 64bit** systems.
 
+A simple memory allocator which receives a pointer to an already allocated block of memory (heap) and its size. This means there are **no system calls (brk, sbrk...)** and it only manages the given block of memory.
+
 This implementation uses the "**free list**" concept. The free list is a doubly linked list and
 the memory is gradually divided into chunks based on what size the user needs. The heap keeps 
 a head pointer to the first chunk in the free list. Each chunk has a header which contains
