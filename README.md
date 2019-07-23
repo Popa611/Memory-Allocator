@@ -20,7 +20,7 @@ useful for merging adjacent chunks in the free list when they are right next to 
 This merging **minimizes fragmentation**.
   
 This implementation on x86 is a little bit slower than the std allocator tested on matrix operations according to microbenchmarks using std::chrono.
-However on x64 it looks like it is a little bit faster on the same matrix operations. Everything is tested on Windows 10.
+However on x64 it looks like it is a little bit faster on the same matrix operations. Everything is tested on Windows 10, Intel Pentium CPU N3710 1.60GHz, 1 CPU, 4 logical and 4 physical cores.
 
 When no suitable chunk exists during allocation -> bad_alloc exception is thrown.  
 When deallocating already free memory -> undefined behaviour.
